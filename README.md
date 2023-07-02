@@ -45,9 +45,10 @@ sim.build();
 // starting temperature = 1.0f (should be greater than 0.5 to span whole sarch-space in initial iteration)
 // ending temperature = 0.001f (should be greater than zero to be able to finish computing)
 // cooling rate = 1.1f (should be greater than 1.0 to be able to finish computing)
+// number of re-heating: 5 (repeating the process 5 times while keeping best parameters, default=5)
 // debugging=true: just outputs performance per iteration
 // device debugging=true: performance info for each device used
-std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f, true,true);
+std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f,5, true,true);
 for (auto& e : prm)
 {
         std::cout << e << std::endl;
@@ -75,4 +76,4 @@ AMD Ryzen 9 7900 12-Core Processor computed 93.8% of total work
 0.99997
 0.999827
 ```
-since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. Since there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
+since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. In this example, there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
