@@ -7,8 +7,8 @@ int main()
 {
     try
     {
-        // trying to approximate square-root algorithm, using a polynomial
-        // y = f(x)
+        // trying to approximate square-root algorithm in (0,1) input range by a polynomial
+        // y = f(x) = y = c0 + x * c1 + x^2 * c2 + x^3 * c3
         const int N = 20000;
         std::vector<float> dataPointsX;
         std::vector<float> dataPointsY;
@@ -20,7 +20,9 @@ int main()
             dataPointsY.push_back(y);
         }
 
-        UFSACL::UltraFastSimulatedAnnealing<4, 10000> sim(
+        // 4 parameters: c0,c1,c2,c3 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3
+        // 100000 clones in parallel
+        UFSACL::UltraFastSimulatedAnnealing<4, 100000> sim(
             std::string("#define NUM_POINTS ") + std::to_string(N) + 
             std::string(
             R"(
@@ -36,9 +38,7 @@ int main()
 
                         // powers of x
                         float x = dataPointsX[loopId];
-                        float x1 = x; 
-                        float x2 = x1 * x1;
-                        float x3 = x2 * x1;
+
 
                         // coefficients, after scaling of normalized parameters
                         float c0 = (parameters[0] - 0.5f)*1000.0f; // (-500,+500) range
@@ -47,7 +47,7 @@ int main()
                         float c3 = (parameters[3] - 0.5f)*1000.0f; // (-500,+500) range
 
                         // approximation
-                        float yApproximation = (((c3 * x) + c2) * x + c1) * x + c0; // y = c0 + x1 * c1 + x2 * c2 + x3 * c3 but with more precision
+                        float yApproximation = (((c3 * x) + c2) * x + c1) * x + c0;
 
                         // data point value
                         float yReal = dataPointsY[loopId];
@@ -62,7 +62,7 @@ int main()
         sim.addUserInput("dataPointsX", dataPointsX);
         sim.addUserInput("dataPointsY", dataPointsY);
         sim.build();
-        std::vector<float> prm = sim.run(1, 0.001, 1.1,25,false,false,true);
+        std::vector<float> prm = sim.run(1.0f, 0.001f, 2.0f,25,false,false,true);
         
         std::cout << "y = " << (prm[0]-0.5f)*1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3)" << std::endl;
         

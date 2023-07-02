@@ -10,9 +10,12 @@ namespace UFSACL
 
     // abstract solver that takes user algorithm into OpenCL kernel and runs on thousands of (GPU/CPU) threads
     // supports maximum 2 billion elements for (num paramters X num objects) [example: 1000 parameters for 2 million objects]
+    // NumObjects = number of clones of state-machine (that are computed in parallel)
+    // NumParameters = number of parameters to tune to minimize energy
     template<int NumParameters, int NumObjects>
     struct UltraFastSimulatedAnnealing
     {
+    private:
         std::string kernel;
         GPGPU::Computer computer;
         GPGPU::HostParameter randomDataIn;
@@ -31,6 +34,7 @@ namespace UFSACL
         std::string userInputs;
         std::string userInputsWithoutTypes;
         std::string funcMin;
+    public:
         UltraFastSimulatedAnnealing(std::string funcToMinimize) :computer(GPGPU::Computer::DEVICE_ALL)
         {
             workGroupThreads = 256;
