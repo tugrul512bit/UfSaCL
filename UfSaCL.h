@@ -280,6 +280,7 @@ namespace UFSACL
             float foundEnergy = std::numeric_limits<float>::max();
             int foundId = -1;
             int iter = 0;
+        
             std::vector<double> perf;
             size_t measuredNanoSecTot = 0;
             {
@@ -339,8 +340,8 @@ namespace UFSACL
                         }
                         else
                         {
-                            if (debug)
-                                std::cout << "reheating..." << std::endl;
+                            if (debug || energyDebug)
+                                std::cout << "reheating. num reheats left="<< reheat << std::endl;
 
                             temp = temperatureStart;
                             iter = 0;
@@ -348,10 +349,10 @@ namespace UFSACL
                     }
                 }
             }
-            if (debug)
+            if (debug || energyDebug)
                 std::cout << "total computation-time=" << measuredNanoSecTot * 0.000000001 << " seconds (this includes debugging console-output that is slow)" << std::endl;
 
-            if (deviceDebug)
+            if (deviceDebug || energyDebug)
             {
                 std::cout << "---------------" << std::endl;
                 std::cout << "OpenCL device info:" << std::endl;
