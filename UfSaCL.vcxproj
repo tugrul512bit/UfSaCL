@@ -150,7 +150,7 @@
     <ClCompile Include="libGPGPU\platform.cpp" />
     <ClCompile Include="libGPGPU\task-queue.cpp" />
     <ClCompile Include="libGPGPU\worker.cpp" />
-    <ClCompile Include="UfSaCL.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="vcpkg.json" />
@@ -168,6 +168,7 @@
     <ClInclude Include="libGPGPU\platform.h" />
     <ClInclude Include="libGPGPU\task-queue.h" />
     <ClInclude Include="libGPGPU\worker.h" />
+    <ClInclude Include="UfSaCL.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
