@@ -45,7 +45,8 @@ sim.build();
 // ending temperature = 0.001f (should be greater than zero to be able to finish computing)
 // cooling rate = 1.1f (should be greater than 1.0 to be able to finish computing)
 // debugging=true: just outputs performance per iteration
-std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f, true);
+// device debugging=true: performance info for each device used
+std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f, true,true);
 for (auto& e : prm)
 {
         std::cout << e << std::endl;
