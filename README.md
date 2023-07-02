@@ -7,6 +7,14 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 - thousands of systems computed in parallel
 
 ```C++
+// Function to minimize energy, with 5 parameters and 1000 system clones(that run in parallel)
+// ```parameters``` array is in OpenCL-local memory and can be randomly accessed for any element fast (some GPUs have only several cycles latency in accessing this memory)
+// NumParameters: a define macro in kernel code, equals to 5 here
+// WorkGroupThreads: a define macro that is equal to number of threads per system (256 currently)
+// threadId: 0-255 ranged integer that points to id value of current thread in work-group in OpenCL kernel execution
+// when number of parameters is greater than 256, this loop handles all extra iterations per thread
+// finally the energy values from all threads are reduced into a single energy result (simply summed in parallel)
+// this example uses only 5 threads per system and the remaining 251 threads are not used
 UFSACL::UltraFastSimulatedAnnealing<5, 1000> sim(R"(
         const int numLoopIter = (NumParameters / WorkGroupThreads) + 1;
         for(int i=0;i<numLoopIter;i++)
@@ -15,6 +23,8 @@ UFSACL::UltraFastSimulatedAnnealing<5, 1000> sim(R"(
             if(loopId < NumParameters)
             {
                 float dif = (parameters[loopId] - 1.0f);
+
+                // simulated annealing minimizes this
                 energy += (test[0]?dif*dif:0.0f);
             }
         }
@@ -35,6 +45,10 @@ sim.build();
 // cooling rate = 1.1f (should be greater than 1.0 to be able to finish computing)
 // debugging=true: just outputs performance per iteration
 std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f, true);
+for (auto& e : prm)
+{
+        std::cout << e << std::endl;
+}
 ```
 
 output:
