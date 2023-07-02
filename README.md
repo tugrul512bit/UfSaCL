@@ -61,10 +61,16 @@ computation-time=0.0003899 seconds
 iteration-72
 computation-time=0.0004613 seconds
 total computation-time=0.0499326 seconds (this includes debugging console-output that is slow)
+---------------
+OpenCL device info:
+GeForce GT 1030 computed 6.1% of total work
+gfx1036 computed 0.1% of total work
+AMD Ryzen 9 7900 12-Core Processor computed 93.8% of total work
+---------------
 0.999984
 0.999819
 0.999983
 0.99997
 0.999827
 ```
-since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f.
+since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. Since there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
