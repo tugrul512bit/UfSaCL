@@ -3,19 +3,20 @@
 This simple simulated-annealing tool uses OpenCL to compute the simulation elements in parallel.
 
 - uses all GPUs+CPUs in single computer
-- 256 threads per system (1 OpenCL work-group per system)
-- allows thousands of parameters per system (up to local-memory limitations of OpenCL implementation of hardware)
-- minimum system copies required = number of GPUs(and other accelerators)
+- 256 threads per state-clone (1 OpenCL work-group per state-clone)
+- allows thousands of parameters per state-clone (up to local-memory limitations of OpenCL implementation of hardware)
+- minimum state copies required = number of GPUs(and other accelerators)
+- all parameter values given by solver are in normalized form (in range (0.0f, 1.0f)) and user maps them to their intended range in kernel
 
 ```C++
-// Function to minimize energy, with 5 parameters and 1000 system clones(that run in parallel)
+// Function to minimize energy, with 5 parameters and 1000 state-clone (that run in parallel)
 // ```parameters``` array is in OpenCL-local memory and can be randomly accessed for any element fast (some GPUs have only several cycles latency in accessing this memory)
 // NumParameters: a define macro in kernel code, equals to 5 here
-// WorkGroupThreads: a define macro that is equal to number of threads per system (256 currently)
+// WorkGroupThreads: a define macro that is equal to number of threads per state-clone (256 currently)
 // threadId: 0-255 ranged integer that points to id value of current thread in work-group in OpenCL kernel execution
 // when number of parameters is greater than 256, this loop handles all extra iterations per thread
 // finally the energy values from all threads are reduced into a single energy result (simply summed in parallel)
-// this example uses only 5 threads per system and the remaining 251 threads are not used
+// this example uses only 5 threads per state-clone and the remaining 251 threads are idle
 UFSACL::UltraFastSimulatedAnnealing<5, 1000> sim(R"(
         const int numLoopIter = (NumParameters / WorkGroupThreads) + 1;
         for(int i=0;i<numLoopIter;i++)
@@ -34,7 +35,7 @@ UFSACL::UltraFastSimulatedAnnealing<5, 1000> sim(R"(
 // sample user-data 
 std::vector<int> test = { 1,2 };
 
-// adding user-data (this is broadcasted to all system clones running in GPUs/CPUs)
+// adding user-data (this is broadcasted to all state-clone running in GPUs/CPUs)
 sim.addUserInput("test", test);
 
 // build all kernels & copy necessary data
