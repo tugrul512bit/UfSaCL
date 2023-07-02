@@ -8,72 +8,109 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 - minimum state copies required = number of GPUs(and other accelerators)
 - all parameter values given by solver are in normalized form (in range (0.0f, 1.0f)) and user maps them to their intended range in kernel
 
+Polynomial curve-fitting sample: 
+
+- std::sqrt(x) is approximated using only 4 parameters: c0,c1,c2,c3 and multiplication with powers of x
+- 20000 data points are used for fitting (that would take too long to compute on single-thread)
+- 100000 clones of states are computed in parallel (total of 25600000 workitems for GPUs)
+
 ```C++
-// Function to minimize energy, with 5 parameters and 1000 state-clone (that run in parallel)
-// ```parameters``` array is in OpenCL-local memory and can be randomly accessed for any element fast (some GPUs have only several cycles latency in accessing this memory)
-// NumParameters: a define macro in kernel code, equals to 5 here
-// WorkGroupThreads: a define macro that is equal to number of threads per state-clone (256 currently)
-// threadId: 0-255 ranged integer that points to id value of current thread in work-group in OpenCL kernel execution
-// when number of parameters is greater than 256, this loop handles all extra iterations per thread
-// finally the energy values from all threads are reduced into a single energy result (simply summed in parallel)
-// this example uses only 5 threads per state-clone and the remaining 251 threads are idle
-UFSACL::UltraFastSimulatedAnnealing<5, 1000> sim(R"(
-        const int numLoopIter = (NumParameters / WorkGroupThreads) + 1;
-        for(int i=0;i<numLoopIter;i++)
-        {
-            const int loopId = threadId + WorkGroupThreads * i;
-            if(loopId < NumParameters)
-            {
-                float dif = (parameters[loopId] - 1.0f);
-
-                // simulated annealing minimizes this
-                energy += (test[0]?dif*dif:0.0f);
-            }
-        }
-)");
-
-// sample user-data 
-std::vector<int> test = { 1,2 };
-
-// adding user-data (this is broadcasted to all state-clone running in GPUs/CPUs)
-sim.addUserInput("test", test);
-
-// build all kernels & copy necessary data
-sim.build();
-
-// get solution parameters
-// starting temperature = 1.0f (should be greater than 0.5 to span whole sarch-space in initial iteration)
-// ending temperature = 0.001f (should be greater than zero to be able to finish computing)
-// cooling rate = 1.1f (should be greater than 1.0 to be able to finish computing)
-// number of re-heating: 5 (repeating the process 5 times while keeping best parameters, default=5)
-// debugging=true: just outputs performance per iteration
-// device debugging=true: performance info for each device used
-std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f,5, true,true);
-for (auto& e : prm)
+#include"UfSaCL.h"
+#include<vector>
+#include<iostream>
+// polynomial curve-fitting sample with 20000 data points & 5 polynomial coefficients
+// normally this would take too much time on just single-thread version but it completes in 12 seconds with a low-end GPU and a high-end CPU
+int main()
 {
-        std::cout << e << std::endl;
+    try
+    {
+        // trying to approximate square-root algorithm in (0,1) input range by a polynomial
+        // y = f(x) = y = c0 + x * c1 + x^2 * c2 + x^3 * c3
+        const int N = 20000;
+        std::vector<float> dataPointsX;
+        std::vector<float> dataPointsY;
+        for (int i = 0; i < N; i++)
+        {
+            float x = i  / (float) N;
+            float y = std::sqrt(x);
+            dataPointsX.push_back(x);
+            dataPointsY.push_back(y);
+        }
+
+        // 4 parameters: c0,c1,c2,c3 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3
+        // 100000 clones in parallel
+        UFSACL::UltraFastSimulatedAnnealing<4, 100000> sim(
+            std::string("#define NUM_POINTS ") + std::to_string(N) + 
+            std::string(
+            R"(
+                // 256 threads looping "numLoopIter" times to compute NUM_POINTS data points error (energy)
+                const int numLoopIter = (NUM_POINTS / WorkGroupThreads) + 1;
+                for(int i=0;i<numLoopIter;i++)
+                {
+                    const int loopId = threadId + WorkGroupThreads * i;
+                    if(loopId < NUM_POINTS)
+                    {
+
+                        // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3
+
+                        // powers of x
+                        float x = dataPointsX[loopId];
+
+
+                        // coefficients, after scaling of normalized parameters
+                        float c0 = (parameters[0] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c1 = (parameters[1] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c2 = (parameters[2] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c3 = (parameters[3] - 0.5f)*1000.0f; // (-500,+500) range
+
+                        // approximation
+                        float yApproximation = (((c3 * x) + c2) * x + c1) * x + c0;
+
+                        // data point value
+                        float yReal = dataPointsY[loopId];
+
+                        // the higher the difference, the higher the energy
+                        float diff = yApproximation - yReal;
+                        energy += diff * diff;
+                    }
+                }
+        )"));
+
+        sim.addUserInput("dataPointsX", dataPointsX);
+        sim.addUserInput("dataPointsY", dataPointsY);
+        sim.build();
+        std::vector<float> prm = sim.run(1.0f, 0.001f, 2.0f,25,false,false,true);
+        
+        std::cout << "y = " << (prm[0]-0.5f)*1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3)" << std::endl;
+        
+        
+
+    }
+    catch (std::exception& ex)
+    {
+        std::cout << ex.what() << std::endl;
+    }
+    return 0;
 }
 ```
 
 output:
 
 ```
-...
-iteration-71
-computation-time=0.0003899 seconds
-iteration-72
-computation-time=0.0004613 seconds
-total computation-time=0.0499326 seconds (this includes debugging console-output that is slow)
----------------
-OpenCL device info:
-GeForce GT 1030 computed 6.1% of total work
-gfx1036 computed 0.1% of total work
-AMD Ryzen 9 7900 12-Core Processor computed 93.8% of total work
----------------
-0.999984
-0.999819
-0.999983
-0.99997
-0.999827
+lower energy found: 737634
+lower energy found: 209079
+lower energy found: 26445.2
+lower energy found: 11496.1
+lower energy found: 1097.19
+lower energy found: 553.719
+lower energy found: 30.4808
+lower energy found: 24.536
+lower energy found: 7.72375
+lower energy found: 5.25135
+lower energy found: 3.46719
+lower energy found: 2.87768
+lower energy found: 2.63414
+lower energy found: 2.61885
+y = 0.128508 + (1.92243 * x) +  (-1.96072 * x^2) +  (0.929654 * x^3)
 ```
-since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. In this example, there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
+
