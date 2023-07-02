@@ -62,11 +62,9 @@ int main()
         sim.addUserInput("dataPointsX", dataPointsX);
         sim.addUserInput("dataPointsY", dataPointsY);
         sim.build();
-        std::vector<float> prm = sim.run(1.0f, 0.001f, 2.0f,25,false,false,true);
+        std::vector<float> prm = sim.run(1.0f, 0.001f, 2.0f,25,true,true,true);
         
         std::cout << "y = " << (prm[0]-0.5f)*1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3)" << std::endl;
-        
-        
 
     }
     catch (std::exception& ex)
