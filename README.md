@@ -76,4 +76,4 @@ AMD Ryzen 9 7900 12-Core Processor computed 93.8% of total work
 0.99997
 0.999827
 ```
-since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. Since there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
+since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f. In this example, there is too small work per work-group (256 threads for just computation of 3 parameters), CPU does more of the work than two GPUs. With more work, GPUs are given more of work automatically.
