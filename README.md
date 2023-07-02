@@ -27,7 +27,6 @@ Polynomial curve-fitting sample:
 #include<vector>
 #include<iostream>
 // polynomial curve-fitting sample with 20000 data points & 5 polynomial coefficients
-// normally this would take too much time on just single-thread version but it completes in 12 seconds with a low-end GPU and a high-end CPU
 int main()
 {
     try
