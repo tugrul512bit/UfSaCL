@@ -1,4 +1,4 @@
-# UfSaCL
+# Ultra Fast Simulated Annealing with OpenCL
 
 This simple simulated-annealing tool uses OpenCL to compute the simulation elements in parallel.
 
