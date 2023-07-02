@@ -20,17 +20,14 @@ int main()
         }
 
         // 5 parameters: c0,c1,c2,c3,c4 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3 + c4*x^4
-        // 100000 clones in parallel
+        // 100000 objects in parallel
+        // 20000 data points
+        // 21 flops per point per object ==> 42 giga-flops per temperature step (few milliseconds for low-end GPU)
         UFSACL::UltraFastSimulatedAnnealing<5, 100000> sim(
             std::string("#define NUM_POINTS ") + std::to_string(N) +
             std::string(
                 R"(
-                // 256 threads looping "numLoopIter" times to compute NUM_POINTS data points error (energy)
-                const int numLoopIter = (NUM_POINTS / WorkGroupThreads) + 1;
-                for(int i=0;i<numLoopIter;i++)
-                {
-                    const int loopId = threadId + WorkGroupThreads * i;
-                    if(loopId < NUM_POINTS)
+                parallelFor(NUM_POINTS,
                     {
 
                         // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
@@ -56,8 +53,8 @@ int main()
                         float diff = yApproximation - yReal;
 
                         energy += diff * diff;
-                    }
-                }
+                    });
+                
         )"));
 
         sim.addUserInput("dataPointsX", dataPointsX);

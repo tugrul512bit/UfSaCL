@@ -89,6 +89,33 @@ namespace UFSACL
                 return seed * UIMAXFLOATINV;
             }
 
+#define parallelFor(ITERS,BODY)                                 \
+{\
+    const int numLoopIter = (ITERS / WorkGroupThreads) + 1;     \
+        for(int i=0;i<numLoopIter;i++)                          \
+        {                                                       \
+            const int loopId = threadId + WorkGroupThreads * i; \
+            if(loopId < ITERS)                                  \
+            {                                                   \
+                BODY                                           \
+            }                                                   \
+        }                                                       \
+}
+
+#define parallelForWithBarrier(ITERS,BODY)                                 \
+{\
+    const int numLoopIter = (ITERS / WorkGroupThreads) + 1;     \
+        for(int i=0;i<numLoopIter;i++)                          \
+        {                                                       \
+            const int loopId = threadId + WorkGroupThreads * i; \
+            if(loopId < ITERS)                                  \
+            {                                                   \
+                BODY                                           \
+            }                                                   \
+            barrier(CLK_LOCAL_MEM_FENCE);                       \
+        }                                                       \
+}
+
 
 
             float funcToMinimize(const int threadId, const int objectId, local float * parameters )") + userInputs + std::string(R"()
