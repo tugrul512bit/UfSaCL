@@ -247,7 +247,8 @@ namespace UFSACL
             return;
         }
 
-        std::vector<float> run(const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, bool debug = false)
+        std::vector<float> run(const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
+            bool debug = false, bool deviceDebug = false)
         {
             auto kernelParams = randomDataIn.next(randomDataOut).next(temperatureIn).next(energyOut).next(parameterIn).next(parameterOut);
             const int sz = userInputFullAccess.size();
@@ -270,6 +271,7 @@ namespace UFSACL
             float foundEnergy = std::numeric_limits<float>::max();
             int foundId = -1;
             int iter = 0;
+            std::vector<double> perf;
             size_t measuredNanoSecTot = 0;
             {
                 GPGPU::Bench benchTot(&measuredNanoSecTot);
@@ -281,7 +283,7 @@ namespace UFSACL
                     size_t measuredNanoSec = 0;
                     {
                         GPGPU::Bench bench(&measuredNanoSec);
-                        computer.compute(kernelParams, "kernelFunction", 0, numWorkGroupsToRun * workGroupThreads, workGroupThreads);
+                        perf = computer.compute(kernelParams, "kernelFunction", 0, numWorkGroupsToRun * workGroupThreads, workGroupThreads);
                         randomDataIn.copyDataFromPtr(randomDataOut.accessPtr<unsigned int>(0));
                         for (int i = 0; i < NumObjects; i++)
                         {
@@ -319,6 +321,18 @@ namespace UFSACL
             }
             if (debug)
                 std::cout << "total computation-time=" << measuredNanoSecTot * 0.000000001 << " seconds (this includes debugging console-output that is slow)" << std::endl;
+
+            if (deviceDebug)
+            {
+                std::cout << "---------------" << std::endl;
+                std::cout << "OpenCL device info:" << std::endl;
+                auto names = computer.deviceNames(false);
+                for (int i = 0; i < names.size(); i++)
+                {
+                    std::cout << names[i] << " computed " << (perf[i] * 100.0) << "% of total work" << std::endl;
+                }
+                std::cout << "---------------" << std::endl;
+            }
             return currentParameters;
         }
     };
