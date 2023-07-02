@@ -124,3 +124,41 @@ AMD Ryzen 9 7900 12-Core Processor computed 44.959% of total work
 y = 0.097096 + (2.51061 * x) +  (-4.62151 * x^2) +  (5.10132 * x^3) +  (-2.1019 * x^4)
 ```
 ![graph](https://i.snipboard.io/LyHKOU.jpg)
+
+Parallel computation loop can be simplified by using in-kernel define macro (that OpenCL implementation allows) ```parallelFor(iters,{ codes(); })```:
+
+```C++
+        UFSACL::UltraFastSimulatedAnnealing<5, 100000> sim(
+            std::string("#define NUM_POINTS ") + std::to_string(N) +
+            std::string(
+                R"(
+                parallelFor(NUM_POINTS,
+                    {
+
+                        // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
+
+                        // powers of x
+                        float x = dataPointsX[loopId];
+
+
+                        // coefficients, after scaling of normalized parameters
+                        float c0 = (parameters[0] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c1 = (parameters[1] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c2 = (parameters[2] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c3 = (parameters[3] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c4 = (parameters[4] - 0.5f)*1000.0f; // (-500,+500) range
+
+                        // approximation polynomial
+                        float yApproximation = ((((c4*x+c3) * x) + c2) * x + c1) * x + c0;
+
+                        // data point value
+                        float yReal = dataPointsY[loopId];
+
+                        // the higher the difference, the higher the energy
+                        float diff = yApproximation - yReal;
+
+                        energy += diff * diff;
+                    });
+                
+        )"));
+```
