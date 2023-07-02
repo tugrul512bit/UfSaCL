@@ -2,9 +2,10 @@
 
 This simple simulated-annealing tool uses OpenCL to compute the simulation elements in parallel.
 
-- 256 threads per system
-- thousands of parameters per system
-- thousands of systems computed in parallel
+- uses all GPUs+CPUs in single computer
+- 256 threads per system (1 OpenCL work-group per system)
+- allows thousands of parameters per system (up to local-memory limitations of OpenCL implementation of hardware)
+- minimum system copies required = number of GPUs(and other accelerators)
 
 ```C++
 // Function to minimize energy, with 5 parameters and 1000 system clones(that run in parallel)
