@@ -162,3 +162,15 @@ Parallel computation loop can be simplified by using in-kernel define macro (tha
                 
         )"));
 ```
+
+The function body in parallelFor has branching so user should not use barriers inside. Barriers have to be called by all participating threads. There is ```parallelForWithBarrier(iters,{  });``` for this:
+
+```C++
+        UFSACL::UltraFastSimulatedAnnealing<5, 100000> sim(R"(
+                    // applies barrier(CLK_LOCAL_MEM_FENCE); between thread-wave iterations (not individual iterations)
+                    parallelForWithBarrier(NUM_POINTS,
+                    {
+                        someLocalArray[loopId]=newValue; // changing a local array on a unique index between threads
+                    });           
+        )"));
+```
