@@ -36,3 +36,20 @@ sim.build();
 // debugging=true: just outputs performance per iteration
 std::vector<float> prm = sim.run(1.0f, 0.001f, 1.1f, true);
 ```
+
+output:
+
+```
+...
+iteration-71
+computation-time=0.0003899 seconds
+iteration-72
+computation-time=0.0004613 seconds
+total computation-time=0.0499326 seconds (this includes debugging console-output that is slow)
+0.999984
+0.999819
+0.999983
+0.99997
+0.999827
+```
+since this sample code minimizes the ```parameters[loopId] - 1.0f```, all parameters approach to 1.0f.
