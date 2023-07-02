@@ -247,9 +247,13 @@ namespace UFSACL
             return;
         }
 
-        std::vector<float> run(const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
-            bool debug = false, bool deviceDebug = false)
+
+        std::vector<float> run(
+            const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
+            const int numReheats = 5,
+            const bool debug = false, const bool deviceDebug = false)
         {
+            int reheat = numReheats;
             auto kernelParams = randomDataIn.next(randomDataOut).next(temperatureIn).next(energyOut).next(parameterIn).next(parameterOut);
             const int sz = userInputFullAccess.size();
             for (int i = 0; i < sz; i++)
@@ -317,6 +321,23 @@ namespace UFSACL
 
                     temp /= temperatureDivider;
                     temperatureIn.access<float>(0) = temp;
+
+                    if (!(temp > temperatureStop))
+                    {
+                        reheat--;
+                        if (reheat == 0)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            if (debug)
+                                std::cout << "reheating..." << std::endl;
+
+                            temp = temperatureStart;
+                            iter = 0;
+                        }
+                    }
                 }
             }
             if (debug)

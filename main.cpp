@@ -20,7 +20,7 @@ int main()
         sim.build();
         for (int i = 0; i < 10; i++)
         {
-            std::vector<float> prm = sim.run(1, 0.001, 1.1, true,true);
+            std::vector<float> prm = sim.run(1, 0.001, 1.1,5, true,true);
             float s = 0.0f;
             for (auto& e : prm)
             {
