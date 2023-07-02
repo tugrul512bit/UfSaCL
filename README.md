@@ -123,4 +123,4 @@ AMD Ryzen 9 7900 12-Core Processor computed 44.959% of total work
 ---------------
 y = 0.097096 + (2.51061 * x) +  (-4.62151 * x^2) +  (5.10132 * x^3) +  (-2.1019 * x^4)
 ```
-
+![graph](https://i.snipboard.io/LyHKOU.jpg)
