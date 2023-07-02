@@ -18,7 +18,7 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 
 Polynomial curve-fitting sample: 
 
-- std::sqrt(x) is approximated using only 4 parameters: c0,c1,c2,c3 and multiplication with powers of x
+- std::sqrt(x) is approximated using 5 parameters: c0,c1,c2,c3,c4 and multiplication with powers of x
 - 20000 data points are used for fitting (that would take too long to compute on single-thread)
 - 100000 clones of states are computed in parallel (total of 25600000 workitems for GPUs)
 
@@ -33,7 +33,7 @@ int main()
     try
     {
         // trying to approximate square-root algorithm in (0,1) input range by a polynomial
-        // y = f(x) = y = c0 + x * c1 + x^2 * c2 + x^3 * c3
+        // y = f(x) = y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
         const int N = 20000;
         std::vector<float> dataPointsX;
         std::vector<float> dataPointsY;
@@ -45,9 +45,9 @@ int main()
             dataPointsY.push_back(y);
         }
 
-        // 4 parameters: c0,c1,c2,c3 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3
+        // 5 parameters: c0,c1,c2,c3,c4 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3 + c4*x^4
         // 100000 clones in parallel
-        UFSACL::UltraFastSimulatedAnnealing<4, 100000> sim(
+        UFSACL::UltraFastSimulatedAnnealing<5, 100000> sim(
             std::string("#define NUM_POINTS ") + std::to_string(N) + 
             std::string(
             R"(
@@ -59,7 +59,7 @@ int main()
                     if(loopId < NUM_POINTS)
                     {
 
-                        // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3
+                        // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
 
                         // powers of x
                         float x = dataPointsX[loopId];
@@ -70,15 +70,17 @@ int main()
                         float c1 = (parameters[1] - 0.5f)*1000.0f; // (-500,+500) range
                         float c2 = (parameters[2] - 0.5f)*1000.0f; // (-500,+500) range
                         float c3 = (parameters[3] - 0.5f)*1000.0f; // (-500,+500) range
+                        float c4 = (parameters[4] - 0.5f)*1000.0f; // (-500,+500) range
 
-                        // approximation
-                        float yApproximation = (((c3 * x) + c2) * x + c1) * x + c0;
+                        // approximation polynomial
+                        float yApproximation = ((((c4*x+c3) * x) + c2) * x + c1) * x + c0;
 
                         // data point value
                         float yReal = dataPointsY[loopId];
 
                         // the higher the difference, the higher the energy
                         float diff = yApproximation - yReal;
+
                         energy += diff * diff;
                     }
                 }
@@ -87,11 +89,13 @@ int main()
         sim.addUserInput("dataPointsX", dataPointsX);
         sim.addUserInput("dataPointsY", dataPointsY);
         sim.build();
-        std::vector<float> prm = sim.run(1.0f, 0.001f, 2.0f,25,false,false,true);
+        float startTemperature = 1.0f; // good if its between 0.5f and 1.0f
+        float stopTemperature = 0.0001f; // the closer to zero, the higher the accuracy, the slower to solution
+        float coolingRate = 1.05f;
+        int numReHeating = 5; // when single cooling is not enough, re-start the process multiple times while keeping the best solution
+        std::vector<float> prm = sim.run(startTemperature, stopTemperature, coolingRate, numReHeating,false,false,true);
         
-        std::cout << "y = " << (prm[0]-0.5f)*1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3)" << std::endl;
-        
-        
+        std::cout << "y = " << (prm[0]-0.5f)*1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3) + " << " (" << (prm[4] - 0.5f) * 1000.0f << " * x^4) "<< std::endl;
 
     }
     catch (std::exception& ex)
@@ -105,20 +109,19 @@ int main()
 output:
 
 ```
-lower energy found: 737634
-lower energy found: 209079
-lower energy found: 26445.2
-lower energy found: 11496.1
-lower energy found: 1097.19
-lower energy found: 553.719
-lower energy found: 30.4808
-lower energy found: 24.536
-lower energy found: 7.72375
-lower energy found: 5.25135
-lower energy found: 3.46719
-lower energy found: 2.87768
-lower energy found: 2.63414
-lower energy found: 2.61885
-y = 0.128508 + (1.92243 * x) +  (-1.96072 * x^2) +  (0.929654 * x^3)
+...
+lower energy found: 1.08967
+reheating. num reheats left=1
+lower energy found: 1.08605
+lower energy found: 1.0735
+lower energy found: 1.0656
+total computation-time=55.7984 seconds (this includes debugging console-output that is slow)
+---------------
+OpenCL device info:
+GeForce GT 1030 computed 24.981% of total work
+gfx1036 computed 30.06% of total work
+AMD Ryzen 9 7900 12-Core Processor computed 44.959% of total work
+---------------
+y = 0.097096 + (2.51061 * x) +  (-4.62151 * x^2) +  (5.10132 * x^3) +  (-2.1019 * x^4)
 ```
 
