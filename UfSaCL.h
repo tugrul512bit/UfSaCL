@@ -4,6 +4,7 @@
 #include<vector>
 #include<string>
 #include<cstdint>
+#include<iostream>
 namespace UFSACL
 {
 
@@ -251,7 +252,7 @@ namespace UFSACL
         std::vector<float> run(
             const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
             const int numReheats = 5,
-            const bool debug = false, const bool deviceDebug = false)
+            const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false)
         {
             int reheat = numReheats;
             auto kernelParams = randomDataIn.next(randomDataOut).next(temperatureIn).next(energyOut).next(parameterIn).next(parameterOut);
@@ -317,6 +318,9 @@ namespace UFSACL
                         {
                             parameterIn.access<float>(i) = currentParameters[i];
                         }
+
+                        if (energyDebug)
+                            std::cout << "lower energy found: " << foundEnergy << std::endl;
                     }
 
                     temp /= temperatureDivider;
