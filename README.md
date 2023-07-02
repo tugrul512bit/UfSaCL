@@ -8,6 +8,14 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 - minimum state copies required = number of GPUs(and other accelerators)
 - all parameter values given by solver are in normalized form (in range (0.0f, 1.0f)) and user maps them to their intended range in kernel
 
+# Dependencies
+
+- Visual Studio (2022 community edition, etc) with vcpkg (that auto-installs OpenCL for the project) ![vcpkg](https://github.com/tugrul512bit/libGPGPU/assets/23708129/4a064dcb-b967-478d-a15f-fc69f4e3e9ee)
+- - Maybe works in Ubuntu without vcpkg too, just need explicitly linking of OpenCL libraries and headers
+- OpenCL 1.2 runtime (s) [Intel's runtime can find CPUs of AMD processors too & run AVX512 on Ryzen 7000 series CPU cores] (multiple platforms are scanned for all devices)
+- OpenCL device(s) like GTX 1050 ti graphics card, a new CPU that has teraflops of performance, integrated GPU, all at the same time can be used as a big unified GPU.
+- C++17
+
 Polynomial curve-fitting sample: 
 
 - std::sqrt(x) is approximated using only 4 parameters: c0,c1,c2,c3 and multiplication with powers of x
