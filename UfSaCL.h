@@ -92,9 +92,9 @@ namespace UFSACL
 #define parallelFor(ITERS,BODY)                                 \
 {\
     const int numLoopIter = (ITERS / WorkGroupThreads) + 1;     \
-        for(int i=0;i<numLoopIter;i++)                          \
+        for(int iGPGPU=0;iGPGPU<numLoopIter;iGPGPU++)                          \
         {                                                       \
-            const int loopId = threadId + WorkGroupThreads * i; \
+            const int loopId = threadId + WorkGroupThreads * iGPGPU; \
             if(loopId < ITERS)                                  \
             {                                                   \
                 BODY                                           \
@@ -105,9 +105,9 @@ namespace UFSACL
 #define parallelForWithBarrier(ITERS,BODY)                                 \
 {\
     const int numLoopIter = (ITERS / WorkGroupThreads) + 1;     \
-        for(int i=0;i<numLoopIter;i++)                          \
+        for(int iGPGPU=0;iGPGPU<numLoopIter;iGPGPU++)                          \
         {                                                       \
-            const int loopId = threadId + WorkGroupThreads * i; \
+            const int loopId = threadId + WorkGroupThreads * iGPGPU; \
             if(loopId < ITERS)                                  \
             {                                                   \
                 BODY                                           \
@@ -116,14 +116,6 @@ namespace UFSACL
         }                                                       \
 }
 
-
-
-            float funcToMinimize(const int threadId, const int objectId, local float * parameters )") + userInputs + std::string(R"()
-            {
-                float energy = 0.0f;
-                )") + funcMin + std::string(R"(
-                return energy;
-            }
 
 
             kernel void kernelFunction(global unsigned int * seedIn, global unsigned int * seedOut, global float * tempIn, global float * energyOut, global float * parameterIn, global float * parameterOut )") + userInputs + std::string(R"()
@@ -151,7 +143,15 @@ namespace UFSACL
                 }
                 seedOut[id]=tmpRnd;
                 barrier(CLK_LOCAL_MEM_FENCE);
-                energies[localId] = funcToMinimize(localId,groupId,parameters )") + userInputsWithoutTypes + std::string(R"();
+
+                // objective function by user                
+                float energy = 0.0f;
+                const int threadId = localId;
+                const int objectId = groupId;
+                )") + funcMin + std::string(R"(
+                energies[localId] = energy;
+                // objective function end
+
                 barrier(CLK_LOCAL_MEM_FENCE);
                 for(unsigned int i=WorkGroupThreads/2;i>=1;i>>=1)
                 {
