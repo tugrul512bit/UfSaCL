@@ -1,72 +1,83 @@
 #include"UfSaCL.h"
 #include<vector>
 #include<iostream>
-// polynomial curve-fitting sample with 20000 data points & 5 polynomial coefficients
+
 int main()
 {
     try
     {
-        // trying to approximate square-root algorithm in (0,1) input range by a polynomial
-        // y = f(x) = y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
-        const int N = 20000;
-        std::vector<float> dataPointsX;
-        std::vector<float> dataPointsY;
-        for (int i = 0; i < N; i++)
-        {
-            float x = i / (float)N;
-            float y = std::sqrt(x);
-            dataPointsX.push_back(x);
-            dataPointsY.push_back(y);
-        }
 
-        // 5 parameters: c0,c1,c2,c3,c4 of polynomial y = c0 + c1*x + c2*x^2 + c3*x^3 + c4*x^4
-        // 100000 objects in parallel
-        // 20000 data points
-        // 21 flops per point per object ==> 42 giga-flops per temperature step (few milliseconds for low-end GPU)
-        UFSACL::UltraFastSimulatedAnnealing<5, 100000> sim(
-            std::string("#define NUM_POINTS ") + std::to_string(N) +
-            std::string(
-                R"(
-                parallelFor(NUM_POINTS,
+        // fit 106 circles into 1 square
+        // r=0.5, d=10.0
+        // 212 parameters: x,y data for 106 circles
+        UFSACL::UltraFastSimulatedAnnealing<106*2, 100000> sim(R"(
+                parallelFor(106,
                     {
+                        const int id = loopId;
+                        // select a circle
+                        const float x = parameters[id*2] * 10.0f; // scaling the normalized parameter to the problem dimensions
+                        const float y = parameters[id*2+1] * 10.0f; // scaling the normalized parameter to the problem dimensions
 
-                        // building the polynomial y = c0 + x * c1 + x^2 * c2 + x^3 * c3 + x^4 * c4
+                        // brute-force checking collisions with other circles
+                        for(int i=0;i<106;i++)
+                        {
+                            if(i == id) continue;
+                            const float x2 = parameters[i*2] * 10.0f;
+                            const float y2 = parameters[i*2+1] * 10.0f;
+                            const float dx = x-x2;
+                            const float dy = y-y2;
+                            // no need for sqrt since its just comparison
+                            const float r2 = dx*dx + dy*dy;
+                            if(r2<1.0f)
+                            {
+                                energy += 1.0f / (r2+0.00001f); // with smoothing to counter division-by-zero
+                            }
+                        }
 
-                        // powers of x
-                        float x = dataPointsX[loopId];
+                        // checking collisions with square borders
+                        if(x<0.5f)
+                            energy += (x-0.5f)*(x-0.5f)*100.0f;
 
+                        if(y<0.5f)
+                            energy += (y-0.5f)*(y-0.5f)*100.0f;
 
-                        // coefficients, after scaling of normalized parameters
-                        float c0 = (parameters[0] - 0.5f)*1000.0f; // (-500,+500) range
-                        float c1 = (parameters[1] - 0.5f)*1000.0f; // (-500,+500) range
-                        float c2 = (parameters[2] - 0.5f)*1000.0f; // (-500,+500) range
-                        float c3 = (parameters[3] - 0.5f)*1000.0f; // (-500,+500) range
-                        float c4 = (parameters[4] - 0.5f)*1000.0f; // (-500,+500) range
+                        if(x>9.5f)
+                            energy += (x-9.5f)*(x-9.5f)*100.0f;
 
-                        // approximation polynomial
-                        float yApproximation = ((((c4*x+c3) * x) + c2) * x + c1) * x + c0;
-
-                        // data point value
-                        float yReal = dataPointsY[loopId];
-
-                        // the higher the difference, the higher the energy
-                        float diff = yApproximation - yReal;
-
-                        energy += diff * diff;
+                        if(y>9.5f)
+                            energy += (y-9.5f)*(y-9.5f)*100.0f;
                     });
                 
-        )"));
+        )");
 
-        sim.addUserInput("dataPointsX", dataPointsX);
-        sim.addUserInput("dataPointsY", dataPointsY);
+
         sim.build();
-        float startTemperature = 1.0f; // good if its between 0.5f and 1.0f
-        float stopTemperature = 0.0001f; // the closer to zero, the higher the accuracy, the slower to solution
-        float coolingRate = 1.05f;
-        int numReHeating = 5; // when single cooling is not enough, re-start the process multiple times while keeping the best solution
-        std::vector<float> prm = sim.run(startTemperature, stopTemperature, coolingRate, numReHeating, false, false, true);
+        float startTemperature = 1.0f; 
+        float stopTemperature = 0.001f; 
+        float coolingRate = 1.2f;
+        bool debugPerformance = false;
+        bool debugDevice = false;
+        bool debugEnergy = true;
+        int numReHeating = 100; 
+        std::vector<float> prm = sim.run(
+            startTemperature, stopTemperature, coolingRate, numReHeating, 
+            debugPerformance, debugDevice, debugEnergy,
+            [](float * optimizedParameters) {
+                // callback that is called whenever a better(lower) energy is found
+                for (int i = 0; i < 106; i++)
+                {
+                    // do something with circle positions, render, etc
+                }
+                std::cout << "------" << std::endl;
+            }
+        );
 
-        std::cout << "y = " << (prm[0] - 0.5f) * 1000.0f << " + (" << (prm[1] - 0.5f) * 1000.0f << " * x) + " << " (" << (prm[2] - 0.5f) * 1000.0f << " * x^2) + " << " (" << (prm[3] - 0.5f) * 1000.0f << " * x^3) + " << " (" << (prm[4] - 0.5f) * 1000.0f << " * x^4) " << std::endl;
+        for (int i = 0; i < 106; i++)
+        {
+            // you can paste this into desmos graph page to see the circles
+            std::cout << "(x-" << prm[i * 2]*10.0f << ")^2 + (y-" << prm[i * 2 + 1]*10.0f<<")^2 = 0.25" << std::endl;
+           
+        }
 
     }
     catch (std::exception& ex)

@@ -283,7 +283,9 @@ namespace UFSACL
         std::vector<float> run(
             const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
             const int numReheats = 5,
-            const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false)
+            const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false,
+            std::function<void(float *)> callbackLowerEnergyFound=[](float *){}
+            )
         {
             int reheat = numReheats;
             auto kernelParams = randomDataIn.next(randomDataOut).next(temperatureIn).next(energyOut).next(parameterIn).next(parameterOut);
@@ -353,6 +355,8 @@ namespace UFSACL
 
                         if (energyDebug)
                             std::cout << "lower energy found: " << foundEnergy << std::endl;
+
+                        callbackLowerEnergyFound(currentParameters.data());
                     }
 
                     temp /= temperatureDivider;
