@@ -8,6 +8,8 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 - minimum state copies required = number of GPUs(and other accelerators)
 - all parameter values given by solver are in normalized form (in range (0.0f, 1.0f)) and user maps them to their intended range in kernel
 
+Wiki: https://github.com/tugrul512bit/UfSaCL/wiki
+
 # Dependencies
 
 - Visual Studio (2022 community edition, etc) with vcpkg (that auto-installs OpenCL for the project) ![vcpkg](https://github.com/tugrul512bit/libGPGPU/assets/23708129/4a064dcb-b967-478d-a15f-fc69f4e3e9ee)
