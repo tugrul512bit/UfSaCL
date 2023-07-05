@@ -12,7 +12,8 @@ namespace UFSACL
     // supports maximum 2 billion elements for (num paramters X num objects) [example: 1000 parameters for 2 million objects]
     // NumObjects = number of clones of state-machine (that are computed in parallel)
     // NumParameters = number of parameters to tune to minimize energy
-    template<int NumParameters, int NumObjects>
+    // ParameterType = float or double
+    template<int NumParameters, int NumObjects, typename ParameterType=float>
     struct UltraFastSimulatedAnnealing
     {
     private:
@@ -29,8 +30,8 @@ namespace UFSACL
         int workGroupThreads;
         int numParametersItersPerWorkgroupWithUnused;
         std::string constants;
-        float currentEnergy;
-        std::vector<float> currentParameters;
+        ParameterType currentEnergy;
+        std::vector<ParameterType> currentParameters;
         std::string userInputs;
         std::string userInputsWithoutTypes;
         std::string funcMin;
@@ -56,9 +57,19 @@ namespace UFSACL
             constants = std::string(R"(
             #define NumItems )") + std::to_string(NumParameters * NumObjects) + std::string(R"(
         )");
-            constants += std::string(R"(
-            #define UIMAXFLOATINV (2.32830644e-10f)
-        )");
+            if constexpr(std::is_floating_point_v<ParameterType> && sizeof(ParameterType)==4)
+                constants += std::string(R"(
+                    #define GPGPU_REAL_VAL float
+                    #define GPGPU_ZERO_REAL_VAL (0.0f)
+                    #define UIMAXFLOATINV (2.32830644e-10f)
+                )");
+            else if (std::is_floating_point_v<ParameterType> && sizeof(ParameterType) == 8)
+                constants += std::string(R"(
+                    #define GPGPU_REAL_VAL double
+                    #define GPGPU_ZERO_REAL_VAL (0.0)
+                    #define UIMAXFLOATINV (2.32830644e-10)
+                )");
+
             constants += std::string(R"(
             #define WorkGroupThreads )") + std::to_string(workGroupThreads) + std::string(R"(
         )");
@@ -84,7 +95,7 @@ namespace UFSACL
 			    return seed;
 		    }
 
-            const float random(unsigned int seed)
+            const GPGPU_REAL_VAL random(unsigned int seed)
             {
                 return seed * UIMAXFLOATINV;
             }
@@ -118,14 +129,14 @@ namespace UFSACL
 
 
 
-            kernel void kernelFunction(global unsigned int * seedIn, global unsigned int * seedOut, global float * tempIn, global float * energyOut, global float * parameterIn, global float * parameterOut )") + userInputs + std::string(R"()
+            kernel void kernelFunction(global unsigned int * seedIn, global unsigned int * seedOut, global GPGPU_REAL_VAL * tempIn, global GPGPU_REAL_VAL * energyOut, global GPGPU_REAL_VAL * parameterIn, global GPGPU_REAL_VAL * parameterOut )") + userInputs + std::string(R"()
             {
                 const int id = get_global_id(0);
                 const int groupId = id / WorkGroupThreads;
                 const int localId = id % WorkGroupThreads;
-                local float parameters[NumParameters];
-                local float energies[WorkGroupThreads];
-                const float temperature = tempIn[0];
+                local GPGPU_REAL_VAL parameters[NumParameters];
+                local GPGPU_REAL_VAL energies[WorkGroupThreads];
+                const GPGPU_REAL_VAL temperature = tempIn[0];
                 const int numLoopIter = (NumParameters / WorkGroupThreads) + 1;
                 unsigned int tmpRnd = seedIn[id];
                 for(int i=0;i<numLoopIter;i++)
@@ -145,7 +156,7 @@ namespace UFSACL
                 barrier(CLK_LOCAL_MEM_FENCE);
 
                 // objective function by user                
-                float energy = 0.0f;
+                GPGPU_REAL_VAL energy = GPGPU_ZERO_REAL_VAL;
                 const int threadId = localId;
                 const int objectId = groupId;
                 )") + funcMin + std::string(R"(
@@ -178,11 +189,11 @@ namespace UFSACL
             computer.compile(kernel, "kernelFunction");
             randomDataIn = computer.createArrayInputLoadBalanced<unsigned int>("rndIn", numWorkGroupsToRun * workGroupThreads);
             randomDataOut = computer.createArrayOutput<unsigned int>("rndOut", numWorkGroupsToRun * workGroupThreads);
-            energyOut = computer.createArrayOutput<float>("energyOut", numWorkGroupsToRun * workGroupThreads);
+            energyOut = computer.createArrayOutput<ParameterType>("energyOut", numWorkGroupsToRun * workGroupThreads);
 
-            parameterIn = computer.createArrayInput<float>("parameterIn", NumParameters);
-            temperatureIn = computer.createArrayInput<float>("tempIn", 1);
-            parameterOut = computer.createArrayOutput<float>("parameterOut",
+            parameterIn = computer.createArrayInput<ParameterType>("parameterIn", NumParameters);
+            temperatureIn = computer.createArrayInput<ParameterType>("tempIn", 1);
+            parameterOut = computer.createArrayOutput<ParameterType>("parameterOut",
                 numWorkGroupsToRun * numParametersItersPerWorkgroupWithUnused * workGroupThreads, numParametersItersPerWorkgroupWithUnused);
 
             for (int i = 0; i < numWorkGroupsToRun * workGroupThreads; i++)
@@ -280,11 +291,11 @@ namespace UFSACL
         }
 
 
-        std::vector<float> run(
-            const float temperatureStart = 1.0f, const float temperatureStop = 0.01f, const float temperatureDivider = 2.0f, 
+        std::vector<ParameterType> run(
+            const ParameterType temperatureStart = 1.0f, const ParameterType temperatureStop = 0.01f, const ParameterType temperatureDivider = 2.0f,
             const int numReheats = 5,
             const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false,
-            std::function<void(float *)> callbackLowerEnergyFound=[](float *){}
+            std::function<void(ParameterType*)> callbackLowerEnergyFound=[](ParameterType*){}
             )
         {
             int reheat = numReheats;
@@ -299,14 +310,14 @@ namespace UFSACL
             // initial guess for parameters (middle-points for all dimensions)
             for (int i = 0; i < NumParameters; i++)
             {
-                parameterIn.access<float>(i) = 0.5f;
+                parameterIn.access<ParameterType>(i) = 0.5f;
             }
 
             // initialize temperature
-            temperatureIn.access<float>(0) = temperatureStart;
+            temperatureIn.access<ParameterType>(0) = temperatureStart;
 
-            float temp = temperatureStart;
-            float foundEnergy = std::numeric_limits<float>::max();
+            ParameterType temp = temperatureStart;
+            ParameterType foundEnergy = std::numeric_limits<ParameterType>::max();
             int foundId = -1;
             int iter = 0;
         
@@ -328,7 +339,7 @@ namespace UFSACL
                         {
                             const int index = i * workGroupThreads;
 
-                            const float energy = energyOut.access<float>(index);
+                            const ParameterType energy = energyOut.access<ParameterType>(index);
                             if (foundEnergy > energy)
                             {
                                 foundEnergy = energy;
@@ -344,13 +355,13 @@ namespace UFSACL
                     {
                         for (int i = 0; i < NumParameters; i++)
                         {
-                            currentParameters[i] = parameterOut.access<float>(i + foundId * numParametersItersPerWorkgroupWithUnused * workGroupThreads);
+                            currentParameters[i] = parameterOut.access<ParameterType>(i + foundId * numParametersItersPerWorkgroupWithUnused * workGroupThreads);
                         }
 
                         // new low-energy point becomes new guess for next iteration
                         for (int i = 0; i < NumParameters; i++)
                         {
-                            parameterIn.access<float>(i) = currentParameters[i];
+                            parameterIn.access<ParameterType>(i) = currentParameters[i];
                         }
 
                         if (energyDebug)
@@ -360,7 +371,7 @@ namespace UFSACL
                     }
 
                     temp /= temperatureDivider;
-                    temperatureIn.access<float>(0) = temp;
+                    temperatureIn.access<ParameterType>(0) = temp;
 
                     if (!(temp > temperatureStop))
                     {
