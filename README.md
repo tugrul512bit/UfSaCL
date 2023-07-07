@@ -52,9 +52,9 @@ int main()
             std::string("#define NUM_POINTS ") + std::to_string(N) + 
             std::string(
             R"(
-                // 256 threads looping "numLoopIter" times to compute NUM_POINTS data points error (energy)
-                const int numLoopIter = (NUM_POINTS / WorkGroupThreads) + 1;
-                for(int i=0;i<numLoopIter;i++)
+                // 256 threads looping "nIter" times to compute NUM_POINTS data points error (energy)
+                const int nIter = (NUM_POINTS / WorkGroupThreads) + 1;
+                for(int i=0;i<nIter;i++)
                 {
                     const int loopId = threadId + WorkGroupThreads * i;
                     if(loopId < NUM_POINTS)
