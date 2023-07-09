@@ -307,7 +307,8 @@ namespace UFSACL
             const ParameterType temperatureStart = 1.0f, const ParameterType temperatureStop = 0.01f, const ParameterType temperatureDivider = 2.0f,
             const int numReheats = 5,
             const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false,
-            std::function<void(ParameterType*)> callbackLowerEnergyFound=[](ParameterType*){}
+            std::function<void(ParameterType*)> callbackLowerEnergyFound=[](ParameterType*){},
+            std::vector<ParameterType> userHintForInitialParametersNormalized=std::vector<ParameterType>()
             )
         {
             int reheat = numReheats;
@@ -319,17 +320,41 @@ namespace UFSACL
                 kernelParams = kernelParamsNew;
             }
 
-            // initial guess for parameters (middle-points for all dimensions)
-            for (int i = 0; i < NumParameters; i++)
+            // initial guess for parameters (middle-points for all dimensions or user hint)
+            if (userHintForInitialParametersNormalized.size() == NumParameters)
             {
-                parameterIn.access<ParameterType>(i) = 0.5f;
+                for (int i = 0; i < NumParameters; i++)
+                {
+                    parameterIn.access<ParameterType>(i) = userHintForInitialParametersNormalized[i];
+                }
+            }
+            else
+            {
+                for (int i = 0; i < NumParameters; i++)
+                {
+                    parameterIn.access<ParameterType>(i) = 0.5f;
+                }
+            }
+
+            ParameterType temp = temperatureStart;
+            ParameterType foundEnergy = std::numeric_limits<ParameterType>::max();
+
+            // compute user-hinted parameters first
+            if (userHintForInitialParametersNormalized.size()==NumParameters)
+            {
+                // to compute with hint parameters exactly, set temperature to zero
+                temperatureIn.access<ParameterType>(0) = 0;
+                // run all GPUs to iterate random seeds
+                computer.compute(kernelParams, "kernelFunction", 0, numWorkGroupsToRun * workGroupThreads, workGroupThreads);
+                randomDataIn.copyDataFromPtr(randomDataOut.accessPtr<unsigned int>(0));
+                // get energy of hint
+                foundEnergy = energyOut.access<ParameterType>(0);
             }
 
             // initialize temperature
             temperatureIn.access<ParameterType>(0) = temperatureStart;
 
-            ParameterType temp = temperatureStart;
-            ParameterType foundEnergy = std::numeric_limits<ParameterType>::max();
+
             int foundId = -1;
             int iter = 0;
         

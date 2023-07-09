@@ -59,6 +59,7 @@ int main()
         bool debugDevice = false;
         bool debugEnergy = true;
         int numReHeating = 100; 
+        std::vector<float> prmInitialGuess(106*2,0.0f); // (optional) guessing all circles at 0.0
         std::vector<float> prm = sim.run(
             startTemperature, stopTemperature, coolingRate, numReHeating, 
             debugPerformance, debugDevice, debugEnergy,
@@ -69,7 +70,8 @@ int main()
                     // do something with circle positions, render, etc
                 }
                 std::cout << "------" << std::endl;
-            }
+            },
+            prmInitialGuess
         );
 
         for (int i = 0; i < 106; i++)
