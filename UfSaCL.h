@@ -34,6 +34,7 @@ namespace UFSACL
         std::vector<ParameterType> currentParameters;
         std::string userInputs;
         std::string userInputsWithoutTypes;
+        std::string userFunction;
         std::string funcMin;
     public:
         UltraFastSimulatedAnnealing(std::string funcToMinimize) :computer(GPGPU::Computer::DEVICE_ALL)
@@ -82,7 +83,7 @@ namespace UFSACL
             #define NumParamsPerThread )") + std::to_string(numParametersItersPerWorkgroupWithUnused) + std::string(R"(
         )");
 
-
+            constants += userFunction;
 
             kernel = constants + std::string(R"(
    		    const unsigned int rnd(unsigned int seed)
@@ -198,6 +199,17 @@ namespace UFSACL
 
             for (int i = 0; i < numWorkGroupsToRun * workGroupThreads; i++)
                 randomDataIn.access<unsigned int>(i) = i;
+        }
+
+        // declare a function before simulated-annealing-kernel, to improve code reusability
+        // can be called multiple times or once to add all user-functions
+        void addFunctionDefinition(std::string userFunctionPrm)
+        {
+            userFunction +=R"(
+)";
+            userFunction += userFunctionPrm;
+            userFunction += R"(
+)";
         }
 
         // use additional buffers from host-environment in simulated-annealing kernel
