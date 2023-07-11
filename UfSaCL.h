@@ -382,6 +382,7 @@ namespace UFSACL
                                 foundEnergy = energy;
                                 foundId = i;
                                 foundBetterEnergy = true;
+                                temp *= temperatureDivider; // as long as better states are found, temperature can be kept high
                             }
 
                         }
