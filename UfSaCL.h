@@ -5,6 +5,7 @@
 #include<string>
 #include<cstdint>
 #include<iostream>
+#include<random>
 namespace UFSACL
 {
 
@@ -13,7 +14,7 @@ namespace UFSACL
     // NumObjects = number of clones of state-machine (that are computed in parallel)
     // NumParameters = number of parameters to tune to minimize energy
     // ParameterType = float or double
-    template<int NumParameters, int NumObjects, typename ParameterType=float>
+    template<int NumParameters, int NumObjects, typename ParameterType = float>
     struct UltraFastSimulatedAnnealing
     {
     private:
@@ -32,12 +33,13 @@ namespace UFSACL
         std::string constants;
         ParameterType currentEnergy;
         std::vector<ParameterType> currentParameters;
+        std::vector<ParameterType> bestParameters;
         std::string userInputs;
         std::string userInputsWithoutTypes;
         std::string userFunction;
         std::string funcMin;
     public:
-        UltraFastSimulatedAnnealing(std::string funcToMinimize, int gpuThreadsPerObject=256, int numGPUsToUse=16) :computer(GPGPU::Computer::DEVICE_ALL,-1,1,true, numGPUsToUse)
+        UltraFastSimulatedAnnealing(std::string funcToMinimize, int gpuThreadsPerObject = 256, int numGPUsToUse = 16) :computer(GPGPU::Computer::DEVICE_ALL, -1, 1, true, numGPUsToUse)
         {
             workGroupThreads = gpuThreadsPerObject;
             numWorkGroupsToRun = NumObjects;
@@ -49,6 +51,7 @@ namespace UFSACL
 
 
             currentParameters.resize(NumParameters);
+            bestParameters.resize(NumParameters);
             funcMin = funcToMinimize;
         }
 
@@ -58,7 +61,7 @@ namespace UFSACL
             constants = std::string(R"(
             #define NumItems )") + std::to_string(NumParameters * NumObjects) + std::string(R"(
         )");
-            if constexpr(std::is_floating_point_v<ParameterType> && sizeof(ParameterType)==4)
+            if constexpr (std::is_floating_point_v<ParameterType> && sizeof(ParameterType) == 4)
                 constants += std::string(R"(
                     #define GPGPU_REAL_VAL float
                     #define GPGPU_ZERO_REAL_VAL (0.0f)
@@ -205,7 +208,7 @@ namespace UFSACL
         // can be called multiple times or once to add all user-functions
         void addFunctionDefinition(std::string userFunctionPrm)
         {
-            userFunction +=R"(
+            userFunction += R"(
 )";
             userFunction += userFunctionPrm;
             userFunction += R"(
@@ -306,11 +309,18 @@ namespace UFSACL
         std::vector<ParameterType> run(
             const ParameterType temperatureStart = 1.0f, const ParameterType temperatureStop = 0.01f, const ParameterType temperatureDivider = 2.0f,
             const int numReheats = 5,
-            const bool debug = false, const bool deviceDebug = false, const bool energyDebug=false,
-            std::function<void(ParameterType*)> callbackLowerEnergyFound=[](ParameterType*){},
-            std::vector<ParameterType> userHintForInitialParametersNormalized=std::vector<ParameterType>()
-            )
+            const bool debug = false, const bool deviceDebug = false, const bool energyDebug = false,
+            std::function<void(ParameterType*)> callbackLowerEnergyFound = [](ParameterType*) {},
+            std::vector<ParameterType> userHintForInitialParametersNormalized = std::vector<ParameterType>()
+        )
         {
+
+            std::random_device rd;
+            std::mt19937 rng{ rd() };
+            std::uniform_real_distribution<float> uid(0.0f, 1.0f);
+
+
+
             int reheat = numReheats;
             auto kernelParams = randomDataIn.next(randomDataOut).next(temperatureIn).next(energyOut).next(parameterIn).next(parameterOut);
             const int sz = userInputFullAccess.size();
@@ -340,7 +350,7 @@ namespace UFSACL
             ParameterType foundEnergy = std::numeric_limits<ParameterType>::max();
 
             // compute user-hinted parameters first
-            if (userHintForInitialParametersNormalized.size()==NumParameters)
+            if (userHintForInitialParametersNormalized.size() == NumParameters)
             {
                 // to compute with hint parameters exactly, set temperature to zero
                 temperatureIn.access<ParameterType>(0) = 0;
@@ -351,15 +361,18 @@ namespace UFSACL
                 foundEnergy = energyOut.access<ParameterType>(0);
             }
 
+
             // initialize temperature
             temperatureIn.access<ParameterType>(0) = temperatureStart;
 
 
             int foundId = -1;
             int iter = 0;
-        
+            int foundIdBest = -1;
+
             std::vector<double> perf;
             size_t measuredNanoSecTot = 0;
+            ParameterType bestEnergy = foundEnergy;
             {
                 GPGPU::Bench benchTot(&measuredNanoSecTot);
                 while (temp > temperatureStop)
@@ -367,11 +380,13 @@ namespace UFSACL
                     if (debug)
                         std::cout << "iteration-" << iter++ << std::endl;
                     bool foundBetterEnergy = false;
+                    bool foundBestEnergy = false;
                     size_t measuredNanoSec = 0;
                     {
                         GPGPU::Bench bench(&measuredNanoSec);
                         perf = computer.compute(kernelParams, "kernelFunction", 0, numWorkGroupsToRun * workGroupThreads, workGroupThreads);
                         randomDataIn.copyDataFromPtr(randomDataOut.accessPtr<unsigned int>(0));
+
                         for (int i = 0; i < NumObjects; i++)
                         {
                             const int index = i * workGroupThreads;
@@ -382,7 +397,23 @@ namespace UFSACL
                                 foundEnergy = energy;
                                 foundId = i;
                                 foundBetterEnergy = true;
-                                temp *= temperatureDivider; // as long as better states are found, temperature can be kept high
+                                if (bestEnergy > energy)
+                                {
+                                    bestEnergy = energy;
+                                    foundIdBest = i;
+                                    foundBestEnergy = true;
+                                }
+                            }
+                            else
+                            {
+                                float rnd0 = uid(rng);
+                                float dE = std::abs(foundEnergy - energy);
+                                if (rnd0 < 1.0f / std::exp(dE / temp))
+                                {
+                                    foundEnergy = energy;
+                                    foundId = i;
+                                    foundBetterEnergy = true;
+                                }
                             }
 
                         }
@@ -391,9 +422,20 @@ namespace UFSACL
                         std::cout << "computation-time=" << measuredNanoSec * 0.000000001 << " seconds" << std::endl;
                     if (foundBetterEnergy)
                     {
+                        temp *= temperatureDivider; // as long as better states are found, temperature can be kept high
+
+
                         for (int i = 0; i < NumParameters; i++)
                         {
                             currentParameters[i] = parameterOut.access<ParameterType>(i + foundId * numParametersItersPerWorkgroupWithUnused * workGroupThreads);
+                        }
+
+                        if (foundBestEnergy)
+                        {
+                            for (int i = 0; i < NumParameters; i++)
+                            {
+                                bestParameters[i] = parameterOut.access<ParameterType>(i + foundIdBest * numParametersItersPerWorkgroupWithUnused * workGroupThreads);
+                            }
                         }
 
                         // new low-energy point becomes new guess for next iteration
@@ -402,10 +444,11 @@ namespace UFSACL
                             parameterIn.access<ParameterType>(i) = currentParameters[i];
                         }
 
-                        if (energyDebug)
-                            std::cout << "lower energy found: " << foundEnergy << std::endl;
+                        if (energyDebug && foundBestEnergy)
+                            std::cout << "lower energy found: " << bestEnergy << std::endl;
 
-                        callbackLowerEnergyFound(currentParameters.data());
+                        if(foundBestEnergy)
+                            callbackLowerEnergyFound(bestParameters.data());
                     }
 
                     temp /= temperatureDivider;
@@ -421,7 +464,7 @@ namespace UFSACL
                         else
                         {
                             if (debug || energyDebug)
-                                std::cout << "reheating. num reheats left="<< reheat << std::endl;
+                                std::cout << "reheating. num reheats left=" << reheat << std::endl;
 
                             temp = temperatureStart;
                             iter = 0;
@@ -443,7 +486,7 @@ namespace UFSACL
                 }
                 std::cout << "---------------" << std::endl;
             }
-            return currentParameters;
+            return bestParameters;
         }
     };
 }

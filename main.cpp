@@ -10,9 +10,7 @@ int main()
         // fit 106 circles into 1 square
         // r=0.5, d=10.0
         // 212 parameters: x,y data for 106 circles
-        int maxGpuThreadsPerObject = 128;
-        int maxGpusToUse = 2;
-        UFSACL::UltraFastSimulatedAnnealing<106*2, 100000> sim(R"(
+        UFSACL::UltraFastSimulatedAnnealing<106 * 2, 10000> sim(R"(
                 parallelFor(106,
                     {
                         const int id = loopId;
@@ -50,37 +48,19 @@ int main()
                             energy += (y-9.5f)*(y-9.5f)*100.0f;
                     });
                 
-        )", maxGpuThreadsPerObject, maxGpusToUse);
+        )",256,2);
 
 
         sim.build();
-        float startTemperature = 1.0f; 
-        float stopTemperature = 0.001f; 
-        float coolingRate = 1.2f;
-        bool debugPerformance = false;
-        bool debugDevice = false;
-        bool debugEnergy = true;
-        int numReHeating = 100; 
-        std::vector<float> prmInitialGuess(106*2,0.0f); // (optional) guessing all circles at 0.0
-        std::vector<float> prm = sim.run(
-            startTemperature, stopTemperature, coolingRate, numReHeating, 
-            debugPerformance, debugDevice, debugEnergy,
-            [](float * optimizedParameters) {
-                // callback that is called whenever a better(lower) energy is found
-                for (int i = 0; i < 106; i++)
-                {
-                    // do something with circle positions, render, etc
-                }
-                std::cout << "------" << std::endl;
-            },
-            prmInitialGuess
-        );
+        float startTemperature = 1.0f;
+        float stopTemperature = 0.00001f;
+        float coolingRate = 1.05f;
+        int numReHeating = 50;
+        std::vector<float> prm = sim.run(startTemperature, stopTemperature, coolingRate, numReHeating, false, false, true);
 
         for (int i = 0; i < 106; i++)
         {
-            // you can paste this into desmos graph page to see the circles
-            std::cout << "(x-" << prm[i * 2]*10.0f << ")^2 + (y-" << prm[i * 2 + 1]*10.0f<<")^2 = 0.25" << std::endl;
-           
+            std::cout << "circle-" << i << ": x=" << prm[i * 2] * 10.0f << " y=" << prm[i * 2 + 1] * 10.0f << std::endl;
         }
 
     }
