@@ -37,9 +37,9 @@ namespace UFSACL
         std::string userFunction;
         std::string funcMin;
     public:
-        UltraFastSimulatedAnnealing(std::string funcToMinimize) :computer(GPGPU::Computer::DEVICE_ALL)
+        UltraFastSimulatedAnnealing(std::string funcToMinimize, int gpuThreadsPerObject=256, int numGPUsToUse=16) :computer(GPGPU::Computer::DEVICE_ALL,-1,1,true, numGPUsToUse)
         {
-            workGroupThreads = 256;
+            workGroupThreads = gpuThreadsPerObject;
             numWorkGroupsToRun = NumObjects;
 
             if (NumParameters % workGroupThreads != 0)

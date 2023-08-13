@@ -10,6 +10,8 @@ int main()
         // fit 106 circles into 1 square
         // r=0.5, d=10.0
         // 212 parameters: x,y data for 106 circles
+        int maxGpuThreadsPerObject = 128;
+        int maxGpusToUse = 2;
         UFSACL::UltraFastSimulatedAnnealing<106*2, 100000> sim(R"(
                 parallelFor(106,
                     {
@@ -48,7 +50,7 @@ int main()
                             energy += (y-9.5f)*(y-9.5f)*100.0f;
                     });
                 
-        )");
+        )", maxGpuThreadsPerObject, maxGpusToUse);
 
 
         sim.build();

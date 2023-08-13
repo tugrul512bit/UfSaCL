@@ -45,14 +45,14 @@ namespace GPGPU
 		selectionIndex >= 0: selects single device from queried device list by index
 		selectionIndex == -1 (DEVICE_SELECTION_ALL):  selects all devices from query list
 		clonesPerDevice: number of times each physical device is duplicated in worker thread array to: overlap I/O to gain more performance, higher load-balancing quality
-			CPU device is not cloned and is taken few of its threads to be dedicated for controling other devices fast. 
+			CPU device is not cloned and is taken few of its threads to be dedicated for controling other devices fast.
 			If there are 4 GPU devices, then a 24-thread CPU is used as a 20-thread CPU by OpenCL's device fission feature and 4 threads serve the GPUs efficiently.
 		giveDirectRamAccessToCPU: OpenCL spec does not give permission to iGPU + CPU map/unmap on same host pointer simultaneously. So one has to pick iGPU or CPU to have direct-access (zero-copy) to RAM during computations.
 			true = CPU gets direct RAM access
 			false = iGPU gets direct RAM access
 			the other one works same as a discrete device
 		*/
-		Computer(int deviceSelection, int selectionIndex = DEVICE_SELECTION_ALL, int clonesPerDevice = 1, bool giveDirectRamAccessToCPU=true);
+		Computer(int deviceSelection, int selectionIndex = DEVICE_SELECTION_ALL, int clonesPerDevice = 1, bool giveDirectRamAccessToCPU = true, int maxDevices = 100);
 
 		// returns number of queried devices (sum of devices from all platforms)
 		int getNumDevices();
@@ -62,7 +62,7 @@ namespace GPGPU
 		*/
 		void compile(std::string kernelCode, std::string kernelName);
 
-		/* 
+		/*
 		parameterName: parameter's name that is used when binding to kernel by setKernelParameter() or by method chaining ( computer.compute(  a.next(b).next(c), "kernelName",..   )  )
 		numElements: number of elements with selected type (template parameter such as int, uint, int8_t, etc)
 		numElementsPerThread: number of elements with selected type accessed by each work-item / gpu-thread / smallest work unit in OpenCL
@@ -93,7 +93,7 @@ namespace GPGPU
 		// creates input array. All elements are copied to all devices.
 		// use for randomly accessing any other data element within any work-item or device
 		template<typename T>
-		HostParameter createArrayInput(std::string parameterName, size_t numElements, size_t numElementsPerThread=1)
+		HostParameter createArrayInput(std::string parameterName, size_t numElements, size_t numElementsPerThread = 1)
 		{
 			return createHostParameter<T>(parameterName, numElements, numElementsPerThread, true, false, true);
 		}
@@ -101,7 +101,7 @@ namespace GPGPU
 		// creates input array. Devices get only their own elements.
 		// use for embarrassingly-parallel data where neighboring data elements are not required
 		template<typename T>
-		HostParameter createArrayInputLoadBalanced(std::string parameterName, size_t numElements, size_t numElementsPerThread=1)
+		HostParameter createArrayInputLoadBalanced(std::string parameterName, size_t numElements, size_t numElementsPerThread = 1)
 		{
 			return createHostParameter<T>(parameterName, numElements, numElementsPerThread, true, false, false);
 		}
@@ -109,7 +109,7 @@ namespace GPGPU
 		// creates output array. Devices copy only their own elements to the output because of possible race-conditions
 		// works like createArrayInputLoadBalanced except for the output
 		template<typename T>
-		HostParameter createArrayOutput(std::string parameterName, size_t numElements, size_t numElementsPerThread=1)
+		HostParameter createArrayOutput(std::string parameterName, size_t numElements, size_t numElementsPerThread = 1)
 		{
 			return createHostParameter<T>(parameterName, numElements, numElementsPerThread, false, true, false);
 		}
