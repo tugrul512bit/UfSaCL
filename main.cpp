@@ -7,60 +7,114 @@ int main()
     try
     {
 
-        // fit 106 circles into 1 square
-        // r=0.5, d=10.0
-        // 212 parameters: x,y data for 106 circles
-        UFSACL::UltraFastSimulatedAnnealing<106 * 2, 10000> sim(R"(
-                parallelFor(106,
-                    {
-                        const int id = loopId;
-                        // select a circle
-                        const float x = parameters[id*2] * 10.0f; // scaling the normalized parameter to the problem dimensions
-                        const float y = parameters[id*2+1] * 10.0f; // scaling the normalized parameter to the problem dimensions
+        // train a neural-network to compute square-root of x
+        // single layer with 8 neurons + 1 output combining neuron with simple summation
+        // 16 (1 bias + 1 multiplier before tanh per neuron) + 8 (multipliers of output's input) + 1 (bias of output)
+        UFSACL::UltraFastSimulatedAnnealing<16 + 8 + 1, 5000> sim(R"(
+     
+                const int nData = numTrainingData[0];
+                double energyLocal = 0.0f;
 
-                        // brute-force checking collisions with other circles
-                        for(int i=0;i<106;i++)
+                // do same work for each pair of input-output & compute error (as energy for simulated annealing)
+                // this parallel for loop is not per workitem but works on all workitems at once, so any local variables (energyLocal) only visible by themselves
+                parallelFor(nData,
+                {
+                        int i=loopId;
+
+                        float output = 0.0f;
+                     
+                        for(int neuronId=0;neuronId<8;neuronId++)
                         {
-                            if(i == id) continue;
-                            const float x2 = parameters[i*2] * 10.0f;
-                            const float y2 = parameters[i*2+1] * 10.0f;
-                            const float dx = x-x2;
-                            const float dy = y-y2;
-                            // no need for sqrt since its just comparison
-                            const float r2 = dx*dx + dy*dy;
-                            if(r2<1.0f)
-                            {
-                                energy += 1.0f / (r2+0.00001f); // with smoothing to counter division-by-zero
-                            }
+                            
+                            // neuron bias
+                            const float bias = parameters[neuronId*2]*2 - 1;
+
+                            // neuron input multiplier
+                            const float mult = parameters[neuronId*2+1]*2 - 1;
+
+                            // neuron output multiplier (actually input of the last neuron on output)
+                            const float multOut = parameters[16+neuronId]*2 - 1;
+
+                            float result = tanh(mult * trainingInput[i] + bias) * multOut;  
+
+                            output += result;
                         }
 
-                        // checking collisions with square borders
-                        if(x<0.5f)
-                            energy += (x-0.5f)*(x-0.5f)*100.0f;
+                        // bias of output
+                        float result = tanh(output + parameters[16+8]*2 - 1);
 
-                        if(y<0.5f)
-                            energy += (y-0.5f)*(y-0.5f)*100.0f;
+                        // how much error did it have against training data?                            
+                        float diff = result - trainingOutput[i]; 
+                        energyLocal += pow(fabs(diff),0.1f);
+                        
+                });
 
-                        if(x>9.5f)
-                            energy += (x-9.5f)*(x-9.5f)*100.0f;
-
-                        if(y>9.5f)
-                            energy += (y-9.5f)*(y-9.5f)*100.0f;
-                    });
+                energy += energyLocal;
                 
         )",256,2);
 
-
+        const int nTrainingData =250000;
+        std::vector<float> trainingDataInput(nTrainingData);
+        std::vector<float> trainingDataOutput(nTrainingData);
+        std::vector<int> numTrainingData = { nTrainingData };
+        for (int i = 0; i < nTrainingData; i++)
+        {
+            trainingDataInput[i] = i / (double)nTrainingData;
+            trainingDataOutput[i] = std::sqrt((double)trainingDataInput[i]);
+        }
+        sim.addUserInput("trainingInput", trainingDataInput);
+        sim.addUserInput("trainingOutput", trainingDataOutput);
+        sim.addUserInput("numTrainingData", numTrainingData);
         sim.build();
         float startTemperature = 1.0f;
-        float stopTemperature = 0.00001f;
-        float coolingRate = 1.05f;
-        int numReHeating = 50;
-        std::vector<float> prm = sim.run(startTemperature, stopTemperature, coolingRate, numReHeating, false, false, true);
+        float stopTemperature = 0.001f;
+        float coolingRate = 1.5f;
+        bool debugPerformance = false;
+        bool debugDevice = false;
+        bool debugEnergy = true;
+        int numReHeating = 3;
+        std::vector<float> prm = sim.run(
+            startTemperature, stopTemperature, coolingRate, numReHeating,
+            debugPerformance, debugDevice, debugEnergy,
+            [](float* optimizedParameters) {
+                // callback that is called whenever a better(lower) energy is found
+                // do something with the optimized parameters
+                float inp = 0.5f;
+                float out = 0.0f;
+                for (int i = 0; i < 8; i++)
+                {
+                    const float bias = optimizedParameters[i * 2] * 2 - 1;
 
-        for (int i = 0; i < 106; i++)
+                    // neuron input multiplier
+                    const float mult = optimizedParameters[i * 2 + 1] * 2 - 1;
+
+                    // neuron output multiplier (actually input of the last neuron on output)
+                    const float multOut = optimizedParameters[16 + i] * 2 - 1;
+
+                    out += std::tanh(mult * inp + bias) * multOut;
+                }
+                std::cout << "sqrt(0.5f)=" << std::tanh(out + (optimizedParameters[16 + 8] * 2 - 1)) << std::endl;
+                std::cout << "------" << std::endl;
+            }
+        );
+
+        for (float inp = 0.1515; inp < 0.9595; inp += 0.1)
         {
-            std::cout << "circle-" << i << ": x=" << prm[i * 2] * 10.0f << " y=" << prm[i * 2 + 1] * 10.0f << std::endl;
+         
+            float out = 0.0f;
+            for (int i = 0; i < 8; i++)
+            {
+                const float bias = prm[i * 2]*2 - 1;
+
+                // neuron input multiplier
+                const float mult = prm[i * 2 + 1] * 2 - 1;
+
+                // neuron output multiplier (actually input of the last neuron on output)
+                const float multOut = prm[16 + i] * 2 - 1;
+
+                out += std::tanh(mult * inp + bias) * multOut;
+            }
+            std::cout << "sqrt("<<inp<<")=" << std::tanh(out + (prm[16 + 8] * 2 - 1))<<"  error = "<<(std::tanh(out + (prm[16 + 8] * 2 - 1)) - std::sqrt(inp))/std::sqrt(inp) * 100<<"%" << std::endl;
         }
 
     }

@@ -6,6 +6,7 @@
 #include<cstdint>
 #include<iostream>
 #include<random>
+#include<limits>
 namespace UFSACL
 {
 
@@ -382,47 +383,59 @@ namespace UFSACL
                     bool foundBetterEnergy = false;
                     bool foundBestEnergy = false;
                     size_t measuredNanoSec = 0;
+                    bool doNotHeat = false;
                     {
                         GPGPU::Bench bench(&measuredNanoSec);
                         perf = computer.compute(kernelParams, "kernelFunction", 0, numWorkGroupsToRun * workGroupThreads, workGroupThreads);
                         randomDataIn.copyDataFromPtr(randomDataOut.accessPtr<unsigned int>(0));
 
+                        ParameterType tmpEn = std::numeric_limits<double>::max();
+                        int tmpI = -1;
+                      
                         for (int i = 0; i < NumObjects; i++)
                         {
                             const int index = i * workGroupThreads;
 
                             const ParameterType energy = energyOut.access<ParameterType>(index);
-                            if (foundEnergy > energy)
+                            if (tmpEn > energy)
                             {
-                                foundEnergy = energy;
-                                foundId = i;
-                                foundBetterEnergy = true;
-                                if (bestEnergy > energy)
-                                {
-                                    bestEnergy = energy;
-                                    foundIdBest = i;
-                                    foundBestEnergy = true;
-                                }
+                                tmpEn = energy;
+                                tmpI = i;
                             }
-                            else
-                            {
-                                float rnd0 = uid(rng);
-                                float dE = std::abs(foundEnergy - energy);
-                                if (rnd0 < 1.0f / std::exp(dE / temp))
-                                {
-                                    foundEnergy = energy;
-                                    foundId = i;
-                                    foundBetterEnergy = true;
-                                }
-                            }
+                        }
 
+                        if (foundEnergy > tmpEn && tmpI>=0)
+                        {
+                            foundEnergy = tmpEn;
+                            foundId = tmpI;
+                            foundBetterEnergy = true;
+                            if (bestEnergy > tmpEn)
+                            {
+                                bestEnergy = tmpEn;
+                                foundIdBest = tmpI;
+                                foundBestEnergy = true;
+                            }
+                        }
+                        else if(false && tmpI >= 0)
+                        {
+                            doNotHeat = true;
+                            double rnd0 = uid(rng);
+                            double dE = std::abs(foundEnergy - tmpEn) / std::abs(std::numeric_limits<double>::min() + foundEnergy);
+                            
+                            if (rnd0 < std::exp(-dE / (temp*0.1)))
+                            {
+                                foundEnergy = tmpEn;
+                                foundId = tmpI;
+                                foundBetterEnergy = true;
+                            }
                         }
                     }
                     if (debug)
                         std::cout << "computation-time=" << measuredNanoSec * 0.000000001 << " seconds" << std::endl;
                     if (foundBetterEnergy)
                     {
-                        temp *= temperatureDivider; // as long as better states are found, temperature can be kept high
+                        if(!doNotHeat)
+                            temp *= temperatureDivider * temperatureDivider; // as long as better states are found, temperature can be kept high
 
 
                         for (int i = 0; i < NumParameters; i++)
