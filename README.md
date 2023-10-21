@@ -14,7 +14,7 @@ This simple simulated-annealing tool uses OpenCL to compute the simulation eleme
 
 - runs N copies of energy kernel on all selected GPU/CPU devices which results in N different parameter combinations with N different energy results
 - selects parameters with the lowest energy
-- applies Metropolis Acceptance Criterion if no energy found is not lower than before
+- applies Metropolis Acceptance Criterion if the energy found is not lower than before
 - calls the callback method given by user on every successful low-energy discovery (to help user-side operations like visualizing the progress, etc)
 - ends when number of re-heating (of simulated annealing process) equals user-given value
 
