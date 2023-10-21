@@ -51,9 +51,9 @@ int main()
 
                 energy += energyLocal;
                 
-        )",256,2);
+        )");
 
-        const int nTrainingData =250000;
+        const int nTrainingData = 250000;
         std::vector<float> trainingDataInput(nTrainingData);
         std::vector<float> trainingDataOutput(nTrainingData);
         std::vector<int> numTrainingData = { nTrainingData };
@@ -100,11 +100,11 @@ int main()
 
         for (float inp = 0.1515; inp < 0.9595; inp += 0.1)
         {
-         
+
             float out = 0.0f;
             for (int i = 0; i < 8; i++)
             {
-                const float bias = prm[i * 2]*2 - 1;
+                const float bias = prm[i * 2] * 2 - 1;
 
                 // neuron input multiplier
                 const float mult = prm[i * 2 + 1] * 2 - 1;
@@ -114,7 +114,7 @@ int main()
 
                 out += std::tanh(mult * inp + bias) * multOut;
             }
-            std::cout << "sqrt("<<inp<<")=" << std::tanh(out + (prm[16 + 8] * 2 - 1))<<"  error = "<<(std::tanh(out + (prm[16 + 8] * 2 - 1)) - std::sqrt(inp))/std::sqrt(inp) * 100<<"%" << std::endl;
+            std::cout << "sqrt(" << inp << ")=" << std::tanh(out + (prm[16 + 8] * 2 - 1)) << "  error = " << (std::tanh(out + (prm[16 + 8] * 2 - 1)) - std::sqrt(inp)) / std::sqrt(inp) * 100 << "%" << std::endl;
         }
 
     }
