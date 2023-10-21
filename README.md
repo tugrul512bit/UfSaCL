@@ -1,12 +1,22 @@
 # Ultra Fast Simulated Annealing with OpenCL
 
-This simple simulated-annealing tool uses OpenCL to compute the simulation elements in parallel.
+## What Does It Do?
+
+This simple simulated-annealing tool uses OpenCL to compute the simulation elements of the simulated annealing in parallel.
 
 - uses all GPUs+CPUs in single computer
-- 256 threads per state-clone (1 OpenCL work-group per state-clone)
-- allows thousands of parameters per state-clone (up to local-memory limitations of OpenCL implementation of hardware)
-- minimum state copies required = number of GPUs(and other accelerators)
+- 256 threads per state-clone (1 OpenCL work-group per state-clone), optional, can be changed to any other number like 1024 for Nvidia gpus.
+- allows thousands of parameters per state-clone (up to local-memory limitations of OpenCL implementation of hardware), generally local memory is limited so it's around few thousands of elements maximum (this should be enough to train some small neural networks) but will be changed to optionally video-memory version for bigger problems, for now they're in local memory for high-throughput & low-latency random-access.
+- minimum state copies required = number of GPUs(and other accelerators), maximum depends on combined video-memory size of computer (and/or RAM if there is also a CPU included)
 - all parameter values given by solver are in normalized form (in range (0.0f, 1.0f)) and user maps them to their intended range in kernel
+
+## How Does It Work?
+
+- runs N copies of energy kernel on all selected GPU/CPU devices which results in N different parameter combinations with N different energy results
+- selects parameters with the lowest energy
+- applies Metropolis Acceptance Criterion if no energy found is not lower than before
+- calls the callback method given by user on every successful low-energy discovery (to help user-side operations like visualizing the progress, etc)
+- ends when number of re-heating (of simulated annealing process) equals user-given value
 
 Wiki: https://github.com/tugrul512bit/UfSaCL/wiki
 
