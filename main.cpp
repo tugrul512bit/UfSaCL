@@ -16,8 +16,8 @@ int main()
         std::vector<int> architecture = { nLayerInput,nLayerHidden1,nLayerHidden2,nLayerHidden3,nLayerOutput };
 
         
-
-        UFSACL::UltraFastSimulatedAnnealing<nParams, 500> sim(R"(
+        // gpu-accelerated simulated-annealing that launches 1 block per simulation
+        UFSACL::UltraFastSimulatedAnnealing<nParams, 5000> sim(R"(
      
                 const int nData = settings[0];
                 const int nLayers = settings[1];
@@ -36,7 +36,7 @@ int main()
                         
                         Compute(architecture, trainingDataInputTmp, trainingDataOutputTmp, nLayers, parameters);
                         float diff = (trainingDataOutput[i] - trainingDataOutputTmp[i]);
-                        energy += diff*diff;
+                        energy += pow(fabs(diff),0.5f);
                         
                 });
 
@@ -121,7 +121,7 @@ int main()
 
         )");
 
-        const int nTrainingData = 250;
+        const int nTrainingData = 2500;
         std::vector<float> trainingDataInput(nTrainingData);
         std::vector<float> trainingDataOutput(nTrainingData);
         std::vector<int> settings = { nTrainingData,(int)architecture.size()};
@@ -135,13 +135,13 @@ int main()
         sim.addUserInput("trainingDataOutput", trainingDataOutput);
         sim.addUserInput("settings", settings);
         sim.build();
-        float startTemperature = 10.0f;
-        float stopTemperature = 0.00001f;
-        float coolingRate = 1.005f;
+        float startTemperature = 1.0f;
+        float stopTemperature = 0.0001f;
+        float coolingRate = 1.1f;
         bool debugPerformance = false;
         bool debugDevice = false;
         bool debugEnergy = true;
-        int numReHeating = 3;
+        int numReHeating = 5;
         std::vector<float> prm = sim.run(
             startTemperature, stopTemperature, coolingRate, numReHeating,
             debugPerformance, debugDevice, debugEnergy,
