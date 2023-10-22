@@ -17,7 +17,7 @@ int main()
 
         
         // gpu-accelerated simulated-annealing that launches 1 block per simulation
-        UFSACL::UltraFastSimulatedAnnealing<nParams, 5000> sim(R"(
+        UFSACL::UltraFastSimulatedAnnealing<nParams, 500> sim(R"(
      
                 const int nData = settings[0];
                 const int nLayers = settings[1];
@@ -35,7 +35,7 @@ int main()
                         trainingDataOutputTmp[0] = 0.0f;
                         
                         Compute(architecture, trainingDataInputTmp, trainingDataOutputTmp, nLayers, parameters);
-                        float diff = (trainingDataOutput[i] - trainingDataOutputTmp[i]);
+                        float diff = (trainingDataOutput[i] - trainingDataOutputTmp[0]);
                         energy += pow(fabs(diff),0.5f);
                         
                 });
@@ -121,7 +121,7 @@ int main()
 
         )");
 
-        const int nTrainingData = 2500;
+        const int nTrainingData = 25000;
         std::vector<float> trainingDataInput(nTrainingData);
         std::vector<float> trainingDataOutput(nTrainingData);
         std::vector<int> settings = { nTrainingData,(int)architecture.size()};
