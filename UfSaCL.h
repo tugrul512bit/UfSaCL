@@ -144,17 +144,31 @@ namespace UFSACL
                 const GPGPU_REAL_VAL temperature = tempIn[0];
                 const int numLoopIter = (NumParameters / WorkGroupThreads) + 1;
                 unsigned int tmpRnd = seedIn[id];
+                const GPGPU_REAL_VAL gpgpuHalf = 0.5;
                 for(int i=0;i<numLoopIter;i++)
                 {
                     const int loopId = localId + WorkGroupThreads * i;
                     if(loopId < NumParameters)
                     {
                         tmpRnd = rnd(tmpRnd);
-                        parameters[loopId] = parameterIn[loopId] + (random(tmpRnd) - 0.5f) * temperature;
-                        while(parameters[loopId]<0.0f)
-                            parameters[loopId]+=1.0f;
-                        while(parameters[loopId]>1.0f)
-                            parameters[loopId]-=1.0f;
+                        GPGPU_REAL_VAL randomization = random(tmpRnd);
+                        tmpRnd = rnd(tmpRnd);
+                        GPGPU_REAL_VAL chance = random(tmpRnd)+(GPGPU_REAL_VAL)0.000000001;
+                        tmpRnd = rnd(tmpRnd);
+                        GPGPU_REAL_VAL probability = random(tmpRnd)+(GPGPU_REAL_VAL)0.000000001;
+                        
+                        GPGPU_REAL_VAL change = (randomization - gpgpuHalf)*temperature;
+
+                        if(chance > 0.97f)
+                            change *= 10.0f;
+                        if(chance > 0.99f)
+                            change *= 5.0f;
+                        if(chance > 0.997f)
+                            change *= 5.0f;
+                        if(chance > 0.9992f)
+                            change *= 5.0f;
+
+                        parameters[loopId] = fmod(parameterIn[loopId] + change + 10000.0,1.0);//fmod((double)parameterIn[loopId] + change + 10000.0,1.0);
                     }
                 }
                 seedOut[id]=tmpRnd;
@@ -391,7 +405,7 @@ namespace UFSACL
 
                         ParameterType tmpEn = std::numeric_limits<double>::max();
                         int tmpI = -1;
-                      
+
                         for (int i = 0; i < NumObjects; i++)
                         {
                             const int index = i * workGroupThreads;
@@ -404,7 +418,7 @@ namespace UFSACL
                             }
                         }
 
-                        if (foundEnergy > tmpEn && tmpI>=0)
+                        if (foundEnergy > tmpEn && tmpI >= 0)
                         {
                             foundEnergy = tmpEn;
                             foundId = tmpI;
@@ -416,13 +430,13 @@ namespace UFSACL
                                 foundBestEnergy = true;
                             }
                         }
-                        else if(false && tmpI >= 0)
+                        else if (false && tmpI >= 0)
                         {
                             doNotHeat = true;
                             double rnd0 = uid(rng);
                             double dE = std::abs(foundEnergy - tmpEn) / std::abs(std::numeric_limits<double>::min() + foundEnergy);
-                            
-                            if (rnd0 < std::exp(-dE / (temp*0.1)))
+
+                            if (rnd0 < std::exp(-dE / (temp * 0.1)))
                             {
                                 foundEnergy = tmpEn;
                                 foundId = tmpI;
@@ -434,8 +448,8 @@ namespace UFSACL
                         std::cout << "computation-time=" << measuredNanoSec * 0.000000001 << " seconds" << std::endl;
                     if (foundBetterEnergy)
                     {
-                        if(!doNotHeat)
-                            temp *= temperatureDivider * temperatureDivider; // as long as better states are found, temperature can be kept high
+                        if (!doNotHeat)
+                            temp *= std::pow(temperatureDivider, 2.0); // as long as better states are found, temperature can be kept high
 
 
                         for (int i = 0; i < NumParameters; i++)
@@ -460,7 +474,7 @@ namespace UFSACL
                         if (energyDebug && foundBestEnergy)
                             std::cout << "lower energy found: " << bestEnergy << std::endl;
 
-                        if(foundBestEnergy)
+                        if (foundBestEnergy)
                             callbackLowerEnergyFound(bestParameters.data());
                     }
 
